@@ -26,10 +26,44 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Build debug APK
+      - name: Prepare persistent signing key (when configured)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.WORDFLOW_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.WORDFLOW_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.WORDFLOW_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.WORDFLOW_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/wordflow-release.jks"
+            echo "WORDFLOW_SIGNING_READY=true" >> "$GITHUB_ENV"
+            echo "WORDFLOW_KEYSTORE_PATH=$RUNNER_TEMP/wordflow-release.jks" >> "$GITHUB_ENV"
+            echo "WORDFLOW_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "WORDFLOW_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "WORDFLOW_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+          else
+            echo "WORDFLOW_SIGNING_READY=false" >> "$GITHUB_ENV"
+            echo "Persistent signing secrets are not configured; building a debug APK. Its signature may not match earlier installs."
+          fi
+
+      - name: Build signed release APK
+        if: env.WORDFLOW_SIGNING_READY == 'true'
+        run: gradle --no-daemon assembleRelease
+
+      - name: Build debug APK (temporary fallback)
+        if: env.WORDFLOW_SIGNING_READY != 'true'
         run: gradle --no-daemon assembleDebug
 
-      - name: Upload debug APK
+      - name: Upload persistent signed APK
+        if: env.WORDFLOW_SIGNING_READY == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wordflow-keyboard-signed-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload debug APK (temporary fallback)
+        if: env.WORDFLOW_SIGNING_READY != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: wordflow-keyboard-debug-apk
