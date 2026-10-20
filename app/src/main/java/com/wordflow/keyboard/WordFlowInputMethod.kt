@@ -8,6 +8,7 @@ import android.inputmethodservice.InputMethodService
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -260,9 +261,13 @@ class WordFlowInputMethod : InputMethodService() {
             setPadding(sideInset, dp(2), sideInset, dp(2))
         }
         keys.forEach { key ->
-            row.addView(makeButton(key.label, if (key.label.length > 2) 12f else 21f) {
-                key.action()
-            }, keyParams(key.weight))
+            val keySize = if (key.label.length > 2) 12f else 21f
+            val button = if (key.label == "⌫") {
+                makeRepeatingBackspaceButton(keySize) { key.action() }
+            } else {
+                makeButton(key.label, keySize) { key.action() }
+            }
+            row.addView(button, keyParams(key.weight))
         }
         parent.addView(row, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(49)
@@ -526,6 +531,45 @@ class WordFlowInputMethod : InputMethodService() {
             }
             setOnClickListener { action() }
         }
+
+    /**
+     * A quick tap deletes once. Holding Backspace starts repeating after a short pause,
+     * then deletes rapidly until the finger is lifted. Selection deletion still uses
+     * Android's normal DEL key event on the first press.
+     */
+    private fun makeRepeatingBackspaceButton(sizeSp: Float, action: () -> Unit): Button {
+        var repeatTask: Runnable? = null
+        return makeButton("⌫", sizeSp) {}.apply {
+            setOnTouchListener { view, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        action()
+                        val task = object : Runnable {
+                            override fun run() {
+                                action()
+                                autoWriteHandler.postDelayed(this, 45L)
+                            }
+                        }
+                        repeatTask = task
+                        autoWriteHandler.postDelayed(task, 320L)
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        repeatTask?.let { autoWriteHandler.removeCallbacks(it) }
+                        repeatTask = null
+                        view.performClick()
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        repeatTask?.let { autoWriteHandler.removeCallbacks(it) }
+                        repeatTask = null
+                        true
+                    }
+                    else -> true
+                }
+            }
+        }
+    }
 
     private fun keyParams(weight: Float) =
         LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, weight).apply {
