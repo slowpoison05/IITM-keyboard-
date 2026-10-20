@@ -83,7 +83,7 @@ class WordFlowInputMethod : InputMethodService() {
             maxLines = 1
         }
         root.addView(statusView, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(20)
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(16)
         ))
 
         previewView = TextView(this).apply {
@@ -94,7 +94,7 @@ class WordFlowInputMethod : InputMethodService() {
             maxLines = 1
         }
         root.addView(previewView, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(24)
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(19)
         ))
 
         val toolsRow = LinearLayout(this).apply {
@@ -133,7 +133,7 @@ class WordFlowInputMethod : InputMethodService() {
             updateUi()
         }, toolParams(0.85f))
         root.addView(toolsRow, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(36)
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(30)
         ))
 
         val autoRow = LinearLayout(this).apply {
@@ -148,7 +148,7 @@ class WordFlowInputMethod : InputMethodService() {
         }
         autoRow.addView(speedButton, toolParams(1.2f))
         root.addView(autoRow, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(38)
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(31)
         ))
 
         if (!symbolsMode) {
@@ -283,7 +283,7 @@ class WordFlowInputMethod : InputMethodService() {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(sideInset, dp(2), sideInset, dp(2))
+            setPadding(sideInset, dp(1), sideInset, dp(1))
         }
         keys.forEach { key ->
             val keySize = if (key.label.length > 2) 12f else 21f
@@ -295,7 +295,7 @@ class WordFlowInputMethod : InputMethodService() {
             row.addView(button, keyParams(key.weight))
         }
         parent.addView(row, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(49)
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(43)
         ))
     }
 
