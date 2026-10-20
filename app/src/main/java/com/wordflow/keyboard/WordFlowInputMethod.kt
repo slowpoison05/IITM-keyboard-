@@ -252,7 +252,7 @@ class WordFlowInputMethod : InputMethodService() {
         clipboardText = text
         tokens.clear()
         val leadingWhitespace = text.takeWhile { it.isWhitespace() }
-        val extracted = Regex("""\\S+\\s*""").findAll(text).map { it.value }.toList()
+        val extracted = Regex("""\S+\s*""").findAll(text).map { it.value }.toList()
         tokens.addAll(extracted)
         if (tokens.isNotEmpty() && leadingWhitespace.isNotEmpty()) {
             tokens[0] = leadingWhitespace + tokens[0]
