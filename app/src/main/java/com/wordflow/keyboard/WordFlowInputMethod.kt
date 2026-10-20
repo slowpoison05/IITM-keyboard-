@@ -4,6 +4,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.inputmethodservice.InputMethodService
 import android.os.Handler
 import android.os.Looper
@@ -69,7 +71,7 @@ class WordFlowInputMethod : InputMethodService() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(4), dp(4), dp(4), dp(4))
-            setBackgroundColor(Color.rgb(225, 231, 240))
+            setBackgroundColor(Color.rgb(211, 218, 230))
         }
 
         statusView = TextView(this).apply {
@@ -350,10 +352,21 @@ class WordFlowInputMethod : InputMethodService() {
     }
 
     private fun deleteBeforeCursor() {
-        if (currentInputConnection == null) return
-        // Use the normal Backspace key event so selected text is deleted as a range.
-        // Do not also delete surrounding text, which could remove an extra character.
-        sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+        val connection = currentInputConnection ?: return
+        // First Backspace removes a selection as a single range.
+        val selected = connection.getSelectedText(0)
+        if (!selected.isNullOrEmpty()) {
+            connection.commitText("", 1)
+            return
+        }
+        // Delete one Unicode code point per repeat tick, not a synthetic key event.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            if (!connection.deleteSurroundingTextInCodePoints(1, 0)) {
+                connection.deleteSurroundingText(1, 0)
+            }
+        } else {
+            connection.deleteSurroundingText(1, 0)
+        }
     }
 
     private fun startOrStopAutoWrite() {
@@ -525,6 +538,21 @@ class WordFlowInputMethod : InputMethodService() {
             minHeight = 0
             minWidth = 0
             setPadding(dp(1), 0, dp(1), 0)
+            stateListAnimator = null
+            val isLetterKey = label.length == 1 && label[0].isLetterOrDigit()
+            val keyColor = when {
+                label == "↵" -> Color.rgb(168, 198, 250)
+                label == "⌫" || label == "⇧" || label == "?123" || label == "ABC" ->
+                    Color.rgb(190, 201, 218)
+                isLetterKey -> Color.rgb(255, 255, 255)
+                else -> Color.rgb(190, 201, 218)
+            }
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(if (sizeSp >= 18f) 7 else 10).toFloat()
+                setColor(keyColor)
+            }
+            setTextColor(Color.rgb(35, 43, 56))
             if (sizeSp >= 18f) {
                 minimumHeight = dp(45)
                 minimumWidth = 0
@@ -540,27 +568,32 @@ class WordFlowInputMethod : InputMethodService() {
     private fun makeRepeatingBackspaceButton(sizeSp: Float, action: () -> Unit): Button {
         var repeatTask: Runnable? = null
         return makeButton("⌫", sizeSp) {}.apply {
+            isLongClickable = true
             setOnTouchListener { view, event ->
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
+                        view.isPressed = true
                         action()
                         val task = object : Runnable {
                             override fun run() {
+                                if (!view.isPressed) return
                                 action()
-                                autoWriteHandler.postDelayed(this, 45L)
+                                autoWriteHandler.postDelayed(this, 28L)
                             }
                         }
                         repeatTask = task
-                        autoWriteHandler.postDelayed(task, 320L)
+                        autoWriteHandler.postDelayed(task, 280L)
                         true
                     }
                     MotionEvent.ACTION_UP -> {
+                        view.isPressed = false
                         repeatTask?.let { autoWriteHandler.removeCallbacks(it) }
                         repeatTask = null
                         view.performClick()
                         true
                     }
                     MotionEvent.ACTION_CANCEL -> {
+                        view.isPressed = false
                         repeatTask?.let { autoWriteHandler.removeCallbacks(it) }
                         repeatTask = null
                         true
