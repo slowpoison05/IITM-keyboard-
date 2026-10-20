@@ -71,7 +71,7 @@ class WordFlowInputMethod : InputMethodService() {
     override fun onCreateInputView(): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(4), dp(1), dp(4), dp(1))
+            setPadding(dp(4), dp(4), dp(4), dp(4))
             setBackgroundColor(Color.rgb(211, 218, 230))
         }
 
@@ -83,7 +83,7 @@ class WordFlowInputMethod : InputMethodService() {
             maxLines = 1
         }
         root.addView(statusView, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(13)
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(20)
         ))
 
         previewView = TextView(this).apply {
@@ -94,7 +94,7 @@ class WordFlowInputMethod : InputMethodService() {
             maxLines = 1
         }
         root.addView(previewView, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(16)
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(24)
         ))
 
         val toolsRow = LinearLayout(this).apply {
@@ -133,7 +133,7 @@ class WordFlowInputMethod : InputMethodService() {
             updateUi()
         }, toolParams(0.85f))
         root.addView(toolsRow, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(27)
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(36)
         ))
 
         val autoRow = LinearLayout(this).apply {
@@ -148,7 +148,7 @@ class WordFlowInputMethod : InputMethodService() {
         }
         autoRow.addView(speedButton, toolParams(1.2f))
         root.addView(autoRow, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(28)
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(38)
         ))
 
         if (!symbolsMode) {
@@ -167,12 +167,12 @@ class WordFlowInputMethod : InputMethodService() {
                 KeySpec("⌫", 1.45f) { deleteBeforeCursor() }
             ))
             addKeyRow(root, listOf(
-                KeySpec("?123", 1.15f) { toggleSymbols() },
-                KeySpec(",", 0.65f) { commitKey(if (shifted) "<" else ",") },
-                KeySpec("☺", 0.65f) { commitKey("😊") },
-                KeySpec("English", 3.1f) { commitKey(" ") },
-                KeySpec(".", 0.65f) { commitKey(if (shifted) ">" else ".") },
-                KeySpec("↵", 1.05f) { handleEnter() }
+                KeySpec("?123", 1.35f) { toggleSymbols() },
+                KeySpec(",", 0.8f) { commitKey(if (shifted) "<" else ",") },
+                KeySpec("☺", 0.8f) { commitKey("😊") },
+                KeySpec("English", 3.5f) { commitKey(" ") },
+                KeySpec(".", 0.8f) { commitKey(if (shifted) ">" else ".") },
+                KeySpec("↵", 1.25f) { handleEnter() }
             ))
         } else if (extraSymbolsMode) {
             addKeyRow(root, listOf(
@@ -189,12 +189,12 @@ class WordFlowInputMethod : InputMethodService() {
                 KeySpec("⌫", 1.45f) { deleteBeforeCursor() }
             ))
             addKeyRow(root, listOf(
-                KeySpec("ABC", 1.35f) { toggleSymbols() },
+                KeySpec("ABC", 1.2f) { symbolsMode = false; extraSymbolsMode = false; setInputView(onCreateInputView()) },
                 KeySpec("123", 1f) { extraSymbolsMode = false; setInputView(onCreateInputView()) },
-                KeySpec(",", 0.8f) { commitKey(",") },
+                KeySpec(",", 0.7f) { commitKey(",") },
                 KeySpec("English", 3f) { commitKey(" ") },
-                KeySpec(".", 0.8f) { commitKey(".") },
-                KeySpec("↵", 1.25f) { handleEnter() }
+                KeySpec(".", 0.7f) { commitKey(".") },
+                KeySpec("↵", 1.1f) { handleEnter() }
             ))
         } else {
             addKeyRow(root, listOf(
@@ -283,7 +283,7 @@ class WordFlowInputMethod : InputMethodService() {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(sideInset, 0, sideInset, 0)
+            setPadding(sideInset, dp(2), sideInset, dp(2))
         }
         keys.forEach { key ->
             val keySize = if (key.label.length > 2) 12f else 21f
@@ -295,7 +295,7 @@ class WordFlowInputMethod : InputMethodService() {
             row.addView(button, keyParams(key.weight))
         }
         parent.addView(row, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(40)
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(49)
         ))
     }
 
@@ -374,19 +374,21 @@ class WordFlowInputMethod : InputMethodService() {
         if (!connection.commitText(value, 1)) updateUi("Editor did not accept input")
     }
 
-    private fun deleteBeforeCursor(count: Int = 1) {
+    private fun deleteBeforeCursor() {
         val connection = currentInputConnection ?: return
+        // First Backspace removes a selection as a single range.
         val selected = connection.getSelectedText(0)
         if (!selected.isNullOrEmpty()) {
             connection.commitText("", 1)
             return
         }
+        // Delete one Unicode code point per repeat tick, not a synthetic key event.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            if (!connection.deleteSurroundingTextInCodePoints(count, 0)) {
-                connection.deleteSurroundingText(count, 0)
+            if (!connection.deleteSurroundingTextInCodePoints(1, 0)) {
+                connection.deleteSurroundingText(1, 0)
             }
         } else {
-            connection.deleteSurroundingText(count, 0)
+            connection.deleteSurroundingText(1, 0)
         }
     }
 
@@ -589,6 +591,7 @@ class WordFlowInputMethod : InputMethodService() {
     private fun makeRepeatingBackspaceButton(sizeSp: Float, action: () -> Unit): Button {
         var repeatTask: Runnable? = null
         return makeButton("⌫", sizeSp) {}.apply {
+            isLongClickable = true
             setOnTouchListener { view, event ->
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
@@ -596,20 +599,26 @@ class WordFlowInputMethod : InputMethodService() {
                         action()
                         val task = object : Runnable {
                             override fun run() {
-                                if (!view.isPressed || repeatTask !== this) return
-                                deleteBeforeCursor(6)
-                                autoWriteHandler.postDelayed(this, 70L)
+                                if (!view.isPressed) return
+                                action()
+                                autoWriteHandler.postDelayed(this, 28L)
                             }
                         }
                         repeatTask = task
-                        autoWriteHandler.postDelayed(task, 300L)
+                        autoWriteHandler.postDelayed(task, 280L)
                         true
                     }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    MotionEvent.ACTION_UP -> {
                         view.isPressed = false
                         repeatTask?.let { autoWriteHandler.removeCallbacks(it) }
                         repeatTask = null
-                        if (event.actionMasked == MotionEvent.ACTION_UP) view.performClick()
+                        view.performClick()
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        view.isPressed = false
+                        repeatTask?.let { autoWriteHandler.removeCallbacks(it) }
+                        repeatTask = null
                         true
                     }
                     else -> true
