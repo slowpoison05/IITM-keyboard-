@@ -6,6 +6,9 @@ import android.content.Context
 import android.graphics.Color
 import android.inputmethodservice.InputMethodService
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.view.KeyEvent
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -29,6 +32,10 @@ class WordFlowInputMethod : InputMethodService() {
     private var characterMode = false
     private var shifted = false
     private var symbolsMode = false
+    private val autoWriteHandler = Handler(Looper.getMainLooper())
+    private var autoWriteRunnable: Runnable? = null
+    private var autoWriteConnection: InputConnection? = null
+    private var speedLevel = 0 // 0 = Fast, 1 = Normal, 2 = Slow
 
     private var statusView: TextView? = null
     private var previewView: TextView? = null
@@ -37,12 +44,21 @@ class WordFlowInputMethod : InputMethodService() {
     private var modeButton: Button? = null
     private var shiftButton: Button? = null
     private var symbolButton: Button? = null
+    private var writeAllButton: Button? = null
+    private var speedButton: Button? = null
 
     private data class KeySpec(
         val label: String,
         val weight: Float = 1f,
         val action: () -> Unit
     )
+
+    override fun onDestroy() {
+        autoWriteRunnable?.let { autoWriteHandler.removeCallbacks(it) }
+        autoWriteRunnable = null
+        autoWriteConnection = null
+        super.onDestroy()
+    }
 
     override fun onCreateInputView(): View {
         val root = LinearLayout(this).apply {
@@ -110,6 +126,21 @@ class WordFlowInputMethod : InputMethodService() {
         }, toolParams(0.85f))
         root.addView(toolsRow, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(36)
+        ))
+
+        val autoRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        writeAllButton = makeButton("▶ Write All", 12f) { startOrStopAutoWrite() }
+        autoRow.addView(writeAllButton, toolParams(2.2f))
+        speedButton = makeButton("Speed: Fast", 12f) {
+            speedLevel = (speedLevel + 1) % 3
+            updateUi("Auto-write speed: " + speedName())
+        }
+        autoRow.addView(speedButton, toolParams(1.2f))
+        root.addView(autoRow, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(38)
         ))
 
         if (!symbolsMode) {
@@ -225,12 +256,12 @@ class WordFlowInputMethod : InputMethodService() {
             setPadding(sideInset, dp(2), sideInset, dp(2))
         }
         keys.forEach { key ->
-            row.addView(makeButton(key.label, if (key.label.length > 2) 11f else 17f) {
+            row.addView(makeButton(key.label, if (key.label.length > 2) 12f else 21f) {
                 key.action()
             }, keyParams(key.weight))
         }
         parent.addView(row, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(43)
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(49)
         ))
     }
 
@@ -305,16 +336,107 @@ class WordFlowInputMethod : InputMethodService() {
             updateUi("No focused text field")
             return
         }
+        connection.finishComposingText()
         if (!connection.commitText(value, 1)) updateUi("Editor did not accept input")
     }
 
     private fun deleteBeforeCursor() {
         val connection = currentInputConnection ?: return
+        // Key events let the editor delete a selected range as well as one character.
+        sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             connection.deleteSurroundingTextInCodePoints(1, 0)
         } else {
             connection.deleteSurroundingText(1, 0)
         }
+    }
+
+    private fun startOrStopAutoWrite() {
+        if (autoWriteRunnable != null) {
+            stopAutoWrite("Auto-write stopped")
+            return
+        }
+        val connection = currentInputConnection
+        if (connection == null) {
+            updateUi("Tap a text field before Write All")
+            return
+        }
+        if (characterMode && nextCharOffset >= clipboardText.length) {
+            updateUi("No characters left; load text or Reset")
+            return
+        }
+        if (!characterMode && nextIndex >= tokens.size) {
+            updateUi("No words left; load text or Reset")
+            return
+        }
+
+        autoWriteConnection = connection
+        writeAllButton?.text = "■ Stop"
+        updateUi("Writing all loaded text • " + speedName())
+
+        val task = object : Runnable {
+            override fun run() {
+                if (autoWriteConnection !== currentInputConnection) {
+                    stopAutoWrite("Stopped because the text field changed")
+                    return
+                }
+                val accepted = if (characterMode) {
+                    if (nextCharOffset >= clipboardText.length) {
+                        stopAutoWrite("All characters written")
+                        return
+                    }
+                    val cp = clipboardText.codePointAt(nextCharOffset)
+                    val count = Character.charCount(cp)
+                    val part = clipboardText.substring(nextCharOffset, nextCharOffset + count)
+                    if (autoWriteConnection?.commitText(part, 1) == true) {
+                        nextCharOffset += count
+                        true
+                    } else false
+                } else {
+                    if (nextIndex >= tokens.size) {
+                        stopAutoWrite("All words written")
+                        return
+                    }
+                    if (autoWriteConnection?.commitText(tokens[nextIndex], 1) == true) {
+                        nextIndex++
+                        true
+                    } else false
+                }
+                if (!accepted) {
+                    stopAutoWrite("Editor did not accept more input")
+                    return
+                }
+                updateUi("Writing… " + if (characterMode) {
+                    nextCharOffset.coerceAtMost(clipboardText.length).toString() + "/" +
+                        clipboardText.length + " characters"
+                } else {
+                    nextIndex.toString() + "/" + tokens.size + " words"
+                })
+                autoWriteHandler.postDelayed(this, autoWriteDelay())
+            }
+        }
+        autoWriteRunnable = task
+        autoWriteHandler.post(task)
+    }
+
+    private fun stopAutoWrite(message: String) {
+        autoWriteRunnable?.let { autoWriteHandler.removeCallbacks(it) }
+        autoWriteRunnable = null
+        autoWriteConnection = null
+        writeAllButton?.text = "▶ Write All"
+        updateUi(message)
+    }
+
+    private fun autoWriteDelay(): Long = when (speedLevel) {
+        0 -> if (characterMode) 8L else 18L
+        1 -> if (characterMode) 20L else 45L
+        else -> if (characterMode) 45L else 100L
+    }
+
+    private fun speedName(): String = when (speedLevel) {
+        0 -> "Fast"
+        1 -> "Normal"
+        else -> "Slow"
     }
 
     private fun handleEnter() {
@@ -378,6 +500,8 @@ class WordFlowInputMethod : InputMethodService() {
 
         modeButton?.text = if (characterMode) "Char" else "Word"
         nextButton?.text = if (characterMode) "Next char" else "Next word"
+        speedButton?.text = "Speed: " + speedName()
+        if (autoWriteRunnable == null) writeAllButton?.text = "▶ Write All"
         nextButton?.isEnabled = if (characterMode) {
             clipboardText.isNotEmpty() && nextCharOffset < clipboardText.length
         } else tokens.isNotEmpty() && nextIndex < tokens.size
@@ -396,6 +520,10 @@ class WordFlowInputMethod : InputMethodService() {
             minHeight = 0
             minWidth = 0
             setPadding(dp(1), 0, dp(1), 0)
+            if (sizeSp >= 18f) {
+                minimumHeight = dp(45)
+                minimumWidth = 0
+            }
             setOnClickListener { action() }
         }
 
