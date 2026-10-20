@@ -325,9 +325,9 @@ class WordFlowInputMethod : InputMethodService() {
 
         if (!isMultiline && action != EditorInfo.IME_ACTION_NONE &&
             action != EditorInfo.IME_ACTION_UNSPECIFIED) {
-            if (!connection.performEditorAction(action)) commitKey("\\n")
+            if (!connection.performEditorAction(action)) commitKey("\n")
         } else {
-            commitKey("\\n")
+            commitKey("\n")
         }
     }
 
@@ -359,9 +359,9 @@ class WordFlowInputMethod : InputMethodService() {
                     val cp = clipboardText.codePointAt(nextCharOffset)
                     val ch = String(Character.toChars(cp))
                     when (ch) {
-                        "\\n" -> "Next: ↵ newline"
-                        "\\r" -> "Next: ↵ carriage return"
-                        "\\t" -> "Next: ⇥ tab"
+                        "\n" -> "Next: ↵ newline"
+                        "\r" -> "Next: ↵ carriage return"
+                        "\t" -> "Next: ⇥ tab"
                         " " -> "Next: ␠ space"
                         else -> "Next: " + ch
                     }
@@ -371,7 +371,7 @@ class WordFlowInputMethod : InputMethodService() {
             when {
                 tokens.isEmpty() -> "WordFlow • standard keyboard ready"
                 nextIndex >= tokens.size -> "Queue complete"
-                else -> "Next: " + tokens[nextIndex].replace("\\n", "↵").trimEnd()
+                else -> "Next: " + tokens[nextIndex].replace("\n", "↵").trimEnd()
             }
         }
 
