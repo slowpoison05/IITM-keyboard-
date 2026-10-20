@@ -5,7 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
 import android.inputmethodservice.InputMethodService
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
@@ -52,6 +51,11 @@ class WordFlowInputMethod : InputMethodService() {
         val weight: Float = 1f,
         val action: () -> Unit
     )
+
+    override fun onFinishInput() {
+        if (autoWriteRunnable != null) stopAutoWrite("Auto-write stopped")
+        super.onFinishInput()
+    }
 
     override fun onDestroy() {
         autoWriteRunnable?.let { autoWriteHandler.removeCallbacks(it) }
@@ -341,14 +345,10 @@ class WordFlowInputMethod : InputMethodService() {
     }
 
     private fun deleteBeforeCursor() {
-        val connection = currentInputConnection ?: return
-        // Key events let the editor delete a selected range as well as one character.
+        if (currentInputConnection == null) return
+        // Use the normal Backspace key event so selected text is deleted as a range.
+        // Do not also delete surrounding text, which could remove an extra character.
         sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            connection.deleteSurroundingTextInCodePoints(1, 0)
-        } else {
-            connection.deleteSurroundingText(1, 0)
-        }
     }
 
     private fun startOrStopAutoWrite() {
