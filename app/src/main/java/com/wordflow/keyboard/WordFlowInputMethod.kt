@@ -206,7 +206,7 @@ class WordFlowInputMethod : InputMethodService() {
                 symbolKey("-"), symbolKey("+"), symbolKey("("), symbolKey(")"), symbolKey("/")
             ), sideInset = dp(8))
             addKeyRow(root, listOf(
-                KeySpec("=\\<", 1.45f) { extraSymbolsMode = true; setInputView(onCreateInputView()) },
+                KeySpec("More", 1.45f) { extraSymbolsMode = true; setInputView(onCreateInputView()) },
                 symbolKey("*"), symbolKey("\""), symbolKey("'"), symbolKey(":"),
                 symbolKey(";"), symbolKey("!"), symbolKey("?"),
                 KeySpec("⌫", 1.45f) { deleteBeforeCursor() }
@@ -589,7 +589,6 @@ class WordFlowInputMethod : InputMethodService() {
     private fun makeRepeatingBackspaceButton(sizeSp: Float, action: () -> Unit): Button {
         var repeatTask: Runnable? = null
         return makeButton("⌫", sizeSp) {}.apply {
-            isLongClickable = true
             setOnTouchListener { view, event ->
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
@@ -597,26 +596,20 @@ class WordFlowInputMethod : InputMethodService() {
                         action()
                         val task = object : Runnable {
                             override fun run() {
-                                if (repeatTask !== this) return
-                                deleteBeforeCursor(4)
-                                autoWriteHandler.postDelayed(this, 55L)
+                                if (!view.isPressed || repeatTask !== this) return
+                                deleteBeforeCursor(6)
+                                autoWriteHandler.postDelayed(this, 70L)
                             }
                         }
                         repeatTask = task
-                        autoWriteHandler.postDelayed(task, 250L)
+                        autoWriteHandler.postDelayed(task, 300L)
                         true
                     }
-                    MotionEvent.ACTION_UP -> {
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                         view.isPressed = false
                         repeatTask?.let { autoWriteHandler.removeCallbacks(it) }
                         repeatTask = null
-                        view.performClick()
-                        true
-                    }
-                    MotionEvent.ACTION_CANCEL -> {
-                        view.isPressed = false
-                        repeatTask?.let { autoWriteHandler.removeCallbacks(it) }
-                        repeatTask = null
+                        if (event.actionMasked == MotionEvent.ACTION_UP) view.performClick()
                         true
                     }
                     else -> true
