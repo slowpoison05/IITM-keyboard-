@@ -164,11 +164,13 @@ class WordFlowInputMethod : InputMethodService() {
         return root
     }
 
-    private fun letterKey(letter: String) = KeySpec(letter, 1f) {
+    private fun letterKey(letter: String) = KeySpec(
+        if (shifted) letter.uppercase() else letter, 1f
+    ) {
         commitKey(if (shifted) letter.uppercase() else letter)
         if (shifted) {
             shifted = false
-            updateUi()
+            setInputView(onCreateInputView())
         }
     }
 
@@ -207,12 +209,11 @@ class WordFlowInputMethod : InputMethodService() {
 
     private fun toggleShift() {
         shifted = !shifted
-        updateUi()
+        setInputView(onCreateInputView())
     }
 
     private fun toggleSymbols() {
         symbolsMode = !symbolsMode
-        val oldRoot = window?.window?.decorView
         // Rebuild the input view so the alternate key set is displayed.
         setInputView(onCreateInputView())
     }
