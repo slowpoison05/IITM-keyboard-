@@ -167,12 +167,12 @@ class WordFlowInputMethod : InputMethodService() {
                 KeySpec("⌫", 1.45f) { deleteBeforeCursor() }
             ))
             addKeyRow(root, listOf(
-                KeySpec("?123", 1.35f) { toggleSymbols() },
-                KeySpec(",", 0.8f) { commitKey(if (shifted) "<" else ",") },
-                KeySpec("☺", 0.8f) { commitKey("😊") },
-                KeySpec("English", 3.5f) { commitKey(" ") },
-                KeySpec(".", 0.8f) { commitKey(if (shifted) ">" else ".") },
-                KeySpec("↵", 1.25f) { handleEnter() }
+                KeySpec("?123", 1.15f) { toggleSymbols() },
+                KeySpec(",", 0.65f) { commitKey(if (shifted) "<" else ",") },
+                KeySpec("☺", 0.65f) { commitKey("😊") },
+                KeySpec("English", 3.1f) { commitKey(" ") },
+                KeySpec(".", 0.65f) { commitKey(if (shifted) ">" else ".") },
+                KeySpec("↵", 1.05f) { handleEnter() }
             ))
         } else if (extraSymbolsMode) {
             addKeyRow(root, listOf(
