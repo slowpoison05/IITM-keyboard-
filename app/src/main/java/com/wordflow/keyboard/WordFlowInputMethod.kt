@@ -34,6 +34,7 @@ class WordFlowInputMethod : InputMethodService() {
     private var characterMode = false
     private var shifted = false
     private var symbolsMode = false
+    private var extraSymbolsMode = false
     private val autoWriteHandler = Handler(Looper.getMainLooper())
     private var autoWriteRunnable: Runnable? = null
     private var autoWriteConnection: InputConnection? = null
@@ -173,6 +174,28 @@ class WordFlowInputMethod : InputMethodService() {
                 KeySpec(".", 0.8f) { commitKey(if (shifted) ">" else ".") },
                 KeySpec("↵", 1.25f) { handleEnter() }
             ))
+        } else if (extraSymbolsMode) {
+            addKeyRow(root, listOf(
+                symbolKey("~"), symbolKey("\u0060"), symbolKey("|"), symbolKey("•"), symbolKey("√"),
+                symbolKey("π"), symbolKey("÷"), symbolKey("×"), symbolKey("§"), symbolKey("∆")
+            ))
+            addKeyRow(root, listOf(
+                symbolKey("€"), symbolKey("¥"), symbolKey("$"), symbolKey("¢"), symbolKey("^"),
+                symbolKey("°"), symbolKey("="), symbolKey("{"), symbolKey("}"), symbolKey("\\")
+            ), sideInset = dp(8))
+            addKeyRow(root, listOf(
+                symbolKey("%"), symbolKey("©"), symbolKey("®"), symbolKey("™"), symbolKey("✓"),
+                symbolKey("["), symbolKey("]"), symbolKey("<"), symbolKey(">"),
+                KeySpec("⌫", 1.45f) { deleteBeforeCursor() }
+            ))
+            addKeyRow(root, listOf(
+                KeySpec("ABC", 1.35f) { toggleSymbols() },
+                KeySpec("123", 1f) { extraSymbolsMode = false; setInputView(onCreateInputView()) },
+                KeySpec(",", 0.8f) { commitKey(",") },
+                KeySpec("English", 3f) { commitKey(" ") },
+                KeySpec(".", 0.8f) { commitKey(".") },
+                KeySpec("↵", 1.25f) { handleEnter() }
+            ))
         } else {
             addKeyRow(root, listOf(
                 symbolKey("1"), symbolKey("2"), symbolKey("3"), symbolKey("4"), symbolKey("5"),
@@ -183,7 +206,7 @@ class WordFlowInputMethod : InputMethodService() {
                 symbolKey("-"), symbolKey("+"), symbolKey("("), symbolKey(")"), symbolKey("/")
             ), sideInset = dp(8))
             addKeyRow(root, listOf(
-                KeySpec("=\\\\<", 1.45f) { toggleShift() },
+                KeySpec("=\\<", 1.45f) { extraSymbolsMode = true; setInputView(onCreateInputView()) },
                 symbolKey("*"), symbolKey("\""), symbolKey("'"), symbolKey(":"),
                 symbolKey(";"), symbolKey("!"), symbolKey("?"),
                 KeySpec("⌫", 1.45f) { deleteBeforeCursor() }
@@ -351,21 +374,19 @@ class WordFlowInputMethod : InputMethodService() {
         if (!connection.commitText(value, 1)) updateUi("Editor did not accept input")
     }
 
-    private fun deleteBeforeCursor() {
+    private fun deleteBeforeCursor(count: Int = 1) {
         val connection = currentInputConnection ?: return
-        // First Backspace removes a selection as a single range.
         val selected = connection.getSelectedText(0)
         if (!selected.isNullOrEmpty()) {
             connection.commitText("", 1)
             return
         }
-        // Delete one Unicode code point per repeat tick, not a synthetic key event.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            if (!connection.deleteSurroundingTextInCodePoints(1, 0)) {
-                connection.deleteSurroundingText(1, 0)
+            if (!connection.deleteSurroundingTextInCodePoints(count, 0)) {
+                connection.deleteSurroundingText(count, 0)
             }
         } else {
-            connection.deleteSurroundingText(1, 0)
+            connection.deleteSurroundingText(count, 0)
         }
     }
 
@@ -576,13 +597,13 @@ class WordFlowInputMethod : InputMethodService() {
                         action()
                         val task = object : Runnable {
                             override fun run() {
-                                if (!view.isPressed) return
-                                action()
-                                autoWriteHandler.postDelayed(this, 28L)
+                                if (repeatTask !== this) return
+                                deleteBeforeCursor(4)
+                                autoWriteHandler.postDelayed(this, 55L)
                             }
                         }
                         repeatTask = task
-                        autoWriteHandler.postDelayed(task, 280L)
+                        autoWriteHandler.postDelayed(task, 250L)
                         true
                     }
                     MotionEvent.ACTION_UP -> {
