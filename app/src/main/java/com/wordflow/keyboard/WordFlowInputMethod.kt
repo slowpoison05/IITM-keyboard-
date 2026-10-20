@@ -225,6 +225,10 @@ class WordFlowInputMethod : InputMethodService() {
         root.addView(View(this), LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(18)
         ))
+        // Additional 20dp bottom strip requested; leave all other behavior unchanged.
+        root.addView(View(this), LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(20)
+        ))
 
         updateUi()
         return root
