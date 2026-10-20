@@ -18,6 +18,19 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            val storePath = System.getenv("WORDFLOW_KEYSTORE_PATH")
+            val storePass = System.getenv("WORDFLOW_KEYSTORE_PASSWORD")
+            val keyAliasValue = System.getenv("WORDFLOW_KEY_ALIAS")
+            val keyPass = System.getenv("WORDFLOW_KEY_PASSWORD")
+            if (!storePath.isNullOrBlank() && !storePass.isNullOrBlank() &&
+                !keyAliasValue.isNullOrBlank() && !keyPass.isNullOrBlank()) {
+                signingConfig = signingConfigs.create("wordflowRelease") {
+                    storeFile = file(storePath)
+                    storePassword = storePass
+                    keyAlias = keyAliasValue
+                    keyPassword = keyPass
+                }
+            }
         }
     }
 
