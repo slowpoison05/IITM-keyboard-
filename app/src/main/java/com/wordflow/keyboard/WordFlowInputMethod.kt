@@ -221,6 +221,11 @@ class WordFlowInputMethod : InputMethodService() {
             ))
         }
 
+        // Keep a bottom clearance strip for Android's built-in keyboard switcher.
+        root.addView(View(this), LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(18)
+        ))
+
         updateUi()
         return root
     }
